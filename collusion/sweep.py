@@ -32,7 +32,13 @@ def run_cell(spec: dict) -> dict:
         adverse_frac=spec["adverse_frac"],
         adverse_cost=spec["adverse_cost"],
         maker_rebate=spec.get("maker_rebate", 0.0),
+        taker_fee=spec.get("taker_fee", 0.0),
         tie_rule=spec.get("tie_rule", "split"),
+        priority_share=spec.get("priority_share", 0.7),
+        allocation_noise=spec.get("allocation_noise", 12.0),
+        maker_rebates=spec.get("maker_rebates"),
+        maker_costs=spec.get("maker_costs"),
+        latency_cost=spec.get("latency_cost", 0.0),
         **grid_kwargs,
     )
     cfg = QLearningConfig(
@@ -72,8 +78,11 @@ PERIODS_FOR_N = {2: 500_000, 3: 1_000_000, 4: 2_500_000, 5: 5_000_000, 6: 8_000_
 
 
 def _spec(sweep, n, af, ac, el, seed, eps=2e-5, alpha=0.125,
-          maker_rebate=0.0, tie_rule="split", tick_size=None, memory=1):
-    return {
+          maker_rebate=0.0, taker_fee=0.0, tie_rule="split", tick_size=None,
+          memory=1, priority_share=0.7, allocation_noise=12.0,
+          maker_rebates=None, maker_costs=None, latency_cost=0.0,
+          periods=None, **extra):
+    out = {
         "sweep": sweep,
         "n_makers": n,
         "adverse_frac": af,
@@ -82,11 +91,26 @@ def _spec(sweep, n, af, ac, el, seed, eps=2e-5, alpha=0.125,
         "epsilon_decay": eps,
         "alpha": alpha,
         "maker_rebate": maker_rebate,
+        "taker_fee": taker_fee,
         "tie_rule": tie_rule,
         "tick_size": tick_size,
         "memory": memory,
+        "priority_share": priority_share,
+        "allocation_noise": allocation_noise,
+        "maker_rebates": maker_rebates,
+        "maker_costs": maker_costs,
+        "latency_cost": latency_cost,
         "seed": seed,
-        "periods": PERIODS_FOR_N.get(n, 500_000),
+        "periods": periods if periods is not None else PERIODS_FOR_N.get(n, 500_000),
+    }
+    out.update(extra)
+    return out
+
+
+def _base_ext_spec(sweep, seed, periods=None, **kwargs):
+    return {
+        **_spec(sweep, 2, 0.5, 0.2, 1.0, seed, periods=periods),
+        **kwargs,
     }
 
 
@@ -119,6 +143,88 @@ def build_design_sweep(seeds=range(10)) -> list[dict]:
     for tr in ("split", "winner_take_all"):
         for s in seeds:
             specs.append(_spec("tie_rule", 2, 0.5, 0.2, 1.0, s, tie_rule=tr))
+    return specs
+
+
+def build_extension_sweep(seeds=range(10), periods: int | None = None) -> list[dict]:
+    """Higher-ROI extension experiments for the design claims.
+
+    These are kept separate from ``build_design_sweep`` so older CSVs remain
+    reproducible while the revision can add realistic priority, fee-split,
+    heterogeneity, and latency variants.
+    """
+
+    specs = []
+    # Intermediate allocation / priority rules. ``split`` is the proportional
+    # pro-rata baseline; the others add stochastic or queue-based priority.
+    for rule in ("split", "random_priority", "pro_rata_noise", "queue_priority", "winner_take_all"):
+        for s in seeds:
+            specs.append(_base_ext_spec("allocation_rule", s, periods, tie_rule=rule))
+
+    # Maker/taker split. ``net_fee`` is taker fee minus maker rebate.
+    fee_conditions = [
+        ("baseline", 0.0, 0.0),
+        ("maker_rebate_only", 0.20, 0.0),
+        ("taker_fee_only", 0.0, 0.20),
+        ("symmetric_fee_rebate", 0.20, 0.20),
+        ("net_fee_10_taker10_rebate00", 0.00, 0.10),
+        ("net_fee_10_taker20_rebate10", 0.10, 0.20),
+        ("net_fee_10_taker30_rebate20", 0.20, 0.30),
+    ]
+    for label, rebate, taker_fee in fee_conditions:
+        for s in seeds:
+            specs.append(
+                _base_ext_spec(
+                    "fee_split",
+                    s,
+                    periods,
+                    fee_condition=label,
+                    maker_rebate=rebate,
+                    taker_fee=taker_fee,
+                    net_fee=taker_fee - rebate,
+                )
+            )
+
+    # Heterogeneous makers: asymmetric per-fill costs or maker rebates.
+    hetero_conditions = [
+        ("symmetric", None, None),
+        ("asymmetric_cost_05", None, (0.0, 0.05)),
+        ("asymmetric_cost_10", None, (0.0, 0.10)),
+        ("asymmetric_rebate_10", (0.10, 0.0), None),
+        ("asymmetric_rebate_and_cost", (0.10, 0.0), (0.0, 0.05)),
+    ]
+    for label, rebates, costs in hetero_conditions:
+        for s in seeds:
+            specs.append(
+                _base_ext_spec(
+                    "heterogeneous_makers",
+                    s,
+                    periods,
+                    heterogeneity=label,
+                    maker_rebates=rebates,
+                    maker_costs=costs,
+                )
+            )
+
+    # Latency / stale-quote proxy: linear quote-update friction.
+    for latency in (0.0, 0.01, 0.03, 0.05, 0.10):
+        for s in seeds:
+            specs.append(_base_ext_spec("latency", s, periods, latency_cost=latency))
+    return specs
+
+
+def build_queue_position_sweep(seeds=range(20), periods: int | None = None) -> list[dict]:
+    """Persistent queue-position stress test.
+
+    ``queue_priority`` is the static proxy used in the first extension sweep.
+    ``persistent_queue`` carries priority across periods and moves quote
+    changers to the back of the queue.
+    """
+
+    specs = []
+    for rule in ("split", "queue_priority", "persistent_queue", "winner_take_all"):
+        for s in seeds:
+            specs.append(_base_ext_spec("queue_position", s, periods, tie_rule=rule))
     return specs
 
 
@@ -174,11 +280,17 @@ if __name__ == "__main__":
     p.add_argument("--full", action="store_true", help="run the full conditions sweep")
     p.add_argument("--design", action="store_true", help="run the market-design lever sweep")
     p.add_argument("--robust", action="store_true", help="run the robustness sweep (alpha, memory)")
+    p.add_argument("--extensions", action="store_true", help="run extension experiments: allocation, fee split, heterogeneity, latency")
+    p.add_argument("--queue-position", action="store_true", help="run persistent queue-position stress test")
     p.add_argument("--out", default="collusion/results/sweep_nmakers.csv")
     args = p.parse_args()
 
     if args.robust:
         specs = build_robustness_sweep(seeds=range(args.seeds))
+    elif args.extensions:
+        specs = build_extension_sweep(seeds=range(args.seeds), periods=args.periods)
+    elif args.queue_position:
+        specs = build_queue_position_sweep(seeds=range(args.seeds), periods=args.periods)
     elif args.design:
         specs = build_design_sweep(seeds=range(args.seeds))
     elif args.full:
@@ -201,6 +313,16 @@ if __name__ == "__main__":
             if not sub.empty:
                 print(f"\n=== {name} ===", flush=True)
                 print(sub.groupby(axis)[["collusion_index", "mean_spread"]].mean().round(3).to_string(), flush=True)
+    elif args.extensions:
+        for name, axis in [("allocation_rule", "tie_rule"), ("fee_split", "fee_condition"),
+                           ("heterogeneous_makers", "heterogeneity"), ("latency", "latency_cost")]:
+            sub = df[df["sweep"] == name]
+            if not sub.empty:
+                print(f"\n=== {name} ===", flush=True)
+                print(sub.groupby(axis)[["collusion_index", "mean_spread"]].mean().round(3).to_string(), flush=True)
+    elif args.queue_position:
+        sub = df[df["sweep"] == "queue_position"]
+        print(sub.groupby("tie_rule")[["collusion_index", "mean_spread"]].mean().round(3).to_string(), flush=True)
     elif args.full:
         for name, axis in [("n_makers", "n_makers"), ("adverse", "adverse_cost"),
                            ("elasticity", "elasticity"), ("exploration", "epsilon_decay")]:

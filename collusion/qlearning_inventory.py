@@ -46,12 +46,13 @@ class InventoryQLearning:
 
     def run(self) -> dict:
         cfg = self.cfg
+        eval_window = min(cfg.eval_window, cfg.periods)
         actions = self.rng.randint(0, self.k, size=self.n)
         inv = np.zeros(self.n, dtype=float)
         states = self._states(actions, inv)
-        profit_trace = np.zeros(cfg.eval_window, dtype=float)
-        spread_trace = np.zeros((cfg.eval_window, self.n), dtype=int)
-        eval_start = cfg.periods - cfg.eval_window
+        profit_trace = np.zeros(eval_window, dtype=float)
+        spread_trace = np.zeros((eval_window, self.n), dtype=int)
+        eval_start = cfg.periods - eval_window
         for t in range(cfg.periods):
             eps = cfg.epsilon0 * np.exp(-cfg.epsilon_decay * t)
             greedy = np.array([self.Q[i, states[i], :].argmax() for i in range(self.n)])

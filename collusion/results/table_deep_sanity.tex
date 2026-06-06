@@ -1,0 +1,21 @@
+\begin{table}[t]
+\caption{Deep-RL sanity check: tabular Q-learning versus small DQN in the duopoly.}
+\label{tab:deep-sanity}
+\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+condition & learner & $\Delta$ & SE & spread & seeds \\
+\midrule
+baseline & dqn & 0.370 & 0.034 & 0.65 & 3 \\
+baseline & tabular & 0.379 & 0.011 & 0.60 & 3 \\
+latency-05 & dqn & 0.197 & 0.045 & 0.61 & 3 \\
+latency-05 & tabular & 0.211 & 0.025 & 0.59 & 3 \\
+maker-rebate-only & dqn & 0.352 & 0.014 & 0.51 & 3 \\
+maker-rebate-only & tabular & 0.344 & 0.004 & 0.48 & 3 \\
+random-priority & dqn & 0.377 & 0.040 & 0.65 & 3 \\
+random-priority & tabular & 0.388 & 0.008 & 0.60 & 3 \\
+taker-fee-only & dqn & 0.373 & 0.036 & 0.66 & 3 \\
+taker-fee-only & tabular & 0.372 & 0.015 & 0.59 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}

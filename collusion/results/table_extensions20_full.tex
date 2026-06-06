@@ -1,0 +1,40 @@
+\begin{table*}[t]
+\caption{Extension experiments at the duopoly: mean $\Delta$, SE, mean spread, and seeds.}
+\label{tab:extensions}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+condition & $\Delta$ & SE & spread & seeds \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{Allocation / priority rule}}\\
+pro-rata-noise & 0.771 & 0.024 & 0.65 & 20 \\
+queue-priority & 0.644 & 0.034 & 0.76 & 20 \\
+random-priority & 0.779 & 0.027 & 0.70 & 20 \\
+split & 0.792 & 0.011 & 0.62 & 20 \\
+winner-take-all & 0.669 & 0.029 & 0.86 & 20 \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{Maker/taker fee split}}\\
+baseline & 0.792 & 0.011 & 0.62 & 20 \\
+maker-rebate-only & 0.523 & 0.051 & 0.51 & 20 \\
+net-fee-10-taker10-rebate00 & 0.796 & 0.014 & 0.63 & 20 \\
+net-fee-10-taker20-rebate10 & 0.819 & 0.032 & 0.62 & 20 \\
+net-fee-10-taker30-rebate20 & 0.498 & 0.052 & 0.55 & 20 \\
+symmetric-fee-rebate & 0.541 & 0.051 & 0.58 & 20 \\
+taker-fee-only & 0.817 & 0.017 & 0.66 & 20 \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{Heterogeneous makers}}\\
+asymmetric-cost-05 & 0.794 & 0.019 & 0.65 & 20 \\
+asymmetric-cost-10 & 0.838 & 0.023 & 0.74 & 20 \\
+asymmetric-rebate-10 & 0.825 & 0.027 & 0.67 & 20 \\
+asymmetric-rebate-and-cost & 0.848 & 0.028 & 0.76 & 20 \\
+symmetric & 0.792 & 0.011 & 0.62 & 20 \\
+\midrule
+\multicolumn{5}{@{}l}{\emph{Latency / quote-update cost}}\\
+0.00 & 0.792 & 0.011 & 0.62 & 20 \\
+0.01 & 0.796 & 0.023 & 0.65 & 20 \\
+0.03 & 0.796 & 0.013 & 0.63 & 20 \\
+0.05 & 0.788 & 0.011 & 0.62 & 20 \\
+0.10 & 0.775 & 0.027 & 0.62 & 20 \\
+\bottomrule
+\end{tabular}
+\end{table*}

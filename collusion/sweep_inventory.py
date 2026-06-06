@@ -28,12 +28,13 @@ def run_cell(spec: dict) -> dict:
     if spec.get("tick_size"):
         grid_kwargs["spread_grid"] = grid_from_tick(spec["tick_size"])
     game = InventoryGame(
-        n_makers=2,
+        n_makers=spec.get("n_makers", 2),
         maker_rebate=spec.get("maker_rebate", 0.0),
+        taker_fee=spec.get("taker_fee", 0.0),
         tie_rule=spec.get("tie_rule", "split"),
         **grid_kwargs,
     )
-    cfg = InvQLearningConfig(periods=PERIODS, seed=spec["seed"])
+    cfg = InvQLearningConfig(periods=spec.get("periods", PERIODS), seed=spec["seed"])
     result = InventoryQLearning(game, cfg).run()
     out = {k: spec[k] for k in spec}
     out.update(
@@ -72,6 +73,53 @@ def build_inventory_sweep(seeds=range(20)) -> list[dict]:
     return specs
 
 
+def build_fee_incidence_sweep(seeds=range(20), periods: int = PERIODS) -> list[dict]:
+    specs = []
+    conditions = [
+        ("baseline", 0.00, 0.00),
+        ("maker_rebate_only", 0.20, 0.00),
+        ("taker_fee_only", 0.00, 0.20),
+        ("symmetric_fee_rebate", 0.20, 0.20),
+        ("same_net_taker_only_10", 0.00, 0.10),
+        ("same_net_maker_heavy_10", 0.20, 0.30),
+    ]
+    for label, rebate, taker_fee in conditions:
+        for s in seeds:
+            specs.append(
+                {
+                    "sweep": "fee_incidence",
+                    "fee_condition": label,
+                    "maker_rebate": rebate,
+                    "taker_fee": taker_fee,
+                    "net_fee": taker_fee - rebate,
+                    "tie_rule": "split",
+                    "tick_size": None,
+                    "seed": s,
+                    "periods": periods,
+                }
+            )
+    return specs
+
+
+def build_concentration_sweep(seeds=range(20), periods: int = PERIODS) -> list[dict]:
+    specs = []
+    for n_makers in (2, 3, 4):
+        for s in seeds:
+            specs.append(
+                {
+                    "sweep": "inventory_concentration",
+                    "n_makers": n_makers,
+                    "maker_rebate": 0.0,
+                    "taker_fee": 0.0,
+                    "tie_rule": "split",
+                    "tick_size": None,
+                    "seed": s,
+                    "periods": periods,
+                }
+            )
+    return specs
+
+
 def run_sweep(specs: list[dict], *, max_workers: int | None = None) -> pd.DataFrame:
     rows = []
     with ProcessPoolExecutor(max_workers=max_workers) as ex:
@@ -87,16 +135,26 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--workers", type=int, default=None)
     p.add_argument("--seeds", type=int, default=20)
+    p.add_argument("--periods", type=int, default=PERIODS)
+    p.add_argument("--fee-incidence", action="store_true", help="run inventory x maker/taker fee-incidence cross")
+    p.add_argument("--concentration", action="store_true", help="run inventory x maker-count concentration sweep")
     p.add_argument("--out", default="collusion/results/inventory_sweep.csv")
     args = p.parse_args()
 
-    specs = build_inventory_sweep(seeds=range(args.seeds))
+    if args.fee_incidence:
+        specs = build_fee_incidence_sweep(seeds=range(args.seeds), periods=args.periods)
+    elif args.concentration:
+        specs = build_concentration_sweep(seeds=range(args.seeds), periods=args.periods)
+    else:
+        specs = build_inventory_sweep(seeds=range(args.seeds))
     print(f"running {len(specs)} inventory cells ...", flush=True)
     df = run_sweep(specs, max_workers=args.workers)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.out, index=False)
     for name, axis in [("baseline", "sweep"), ("rebate", "maker_rebate"),
-                       ("tick_size", "tick_size"), ("tie_rule", "tie_rule")]:
+                       ("tick_size", "tick_size"), ("tie_rule", "tie_rule"),
+                       ("fee_incidence", "fee_condition"),
+                       ("inventory_concentration", "n_makers")]:
         sub = df[df["sweep"] == name]
         if not sub.empty:
             print(f"\n=== {name} ===", flush=True)

@@ -1,0 +1,18 @@
+\begin{table*}[t]
+\centering
+\caption{Fee incidence in the stochastic-mid-price inventory model (duopoly, $20$ seeds, $8\times10^5$ periods per cell). Pure maker-rebate and taker-fee schedules are close to baseline, but symmetric and same-net maker-heavy schedules reduce learned collusion relative to taker-side fee incidence.}
+\label{tab:inventory-fee}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Condition & $\Delta$ & SE & spread & profit & seeds \\
+\midrule
+Baseline & 0.852 & 0.020 & 0.75 & 0.136 & 20 \\
+Maker rebate only & 0.846 & 0.032 & 0.64 & 0.173 & 20 \\
+Taker fee only & 0.844 & 0.019 & 0.76 & 0.112 & 20 \\
+Symmetric fee/rebate & 0.745 & 0.043 & 0.61 & 0.132 & 20 \\
+Same net fee: taker-only & 0.874 & 0.020 & 0.77 & 0.127 & 20 \\
+Same net fee: maker-heavy & 0.794 & 0.038 & 0.59 & 0.125 & 20 \\
+\bottomrule
+\end{tabular}
+\end{table*}

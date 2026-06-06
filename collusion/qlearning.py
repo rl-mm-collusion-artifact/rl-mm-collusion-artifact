@@ -99,12 +99,14 @@ class MultiAgentQLearning:
 
     def run(self) -> dict:
         cfg = self.cfg
+        eval_window = min(cfg.eval_window, cfg.periods)
         # Start from a random profile.
-        actions = self.rng.randint(0, self.k, size=self.n)
-        state = self._state(actions)
-        profit_trace = np.zeros(cfg.eval_window, dtype=float)
-        action_trace = np.zeros((cfg.eval_window, self.n), dtype=int)
-        eval_start = cfg.periods - cfg.eval_window
+        last_actions = self.rng.randint(0, self.k, size=self.n)
+        queue_order = self.rng.permutation(self.n) if self.game.tie_rule == "persistent_queue" else None
+        state = self._state(last_actions)
+        profit_trace = np.zeros(eval_window, dtype=float)
+        action_trace = np.zeros((eval_window, self.n), dtype=int)
+        eval_start = cfg.periods - eval_window
         for t in range(cfg.periods):
             eps = cfg.epsilon0 * np.exp(-cfg.epsilon_decay * t)
             # Epsilon-greedy action selection per agent.
@@ -112,7 +114,7 @@ class MultiAgentQLearning:
             explore = self.rng.random(self.n) < eps
             rand = self.rng.randint(0, self.k, size=self.n)
             actions = np.where(explore, rand, greedy)
-            rewards = self.game.step(actions, self.rng)
+            rewards = self.game.step(actions, self.rng, prev_actions=last_actions, queue_order=queue_order)
             next_state = self._state(actions)
             # Q-update per agent.
             for i in range(self.n):
@@ -121,6 +123,8 @@ class MultiAgentQLearning:
                 td = rewards[i] + cfg.gamma * best_next - self.Q[i, state, a]
                 self.Q[i, state, a] += cfg.alpha * td
             state = next_state
+            queue_order = self.game.update_queue_order(actions, last_actions, queue_order)
+            last_actions = actions
             if t >= eval_start:
                 j = t - eval_start
                 profit_trace[j] = rewards.mean()

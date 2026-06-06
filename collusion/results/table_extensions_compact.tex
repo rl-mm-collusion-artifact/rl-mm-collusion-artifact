@@ -1,0 +1,24 @@
+\begin{table*}[t]
+\centering
+\caption{Additional full-horizon stress tests. Values are mean collusion index $\Delta$ over $20$ seeds; base and routing cells use $5\times10^5$ periods and inventory cells use $8\times10^5$ periods.}
+\label{tab:extensions-compact}
+\footnotesize
+\begin{tabular}{@{}llc@{\qquad}llc@{}}
+\toprule
+Block & Condition & $\Delta$ & Block & Condition & $\Delta$ \\
+\midrule
+Allocation & random priority & 0.779 & Fee split & maker rebate only & 0.523 \\
+Allocation & noisy pro-rata & 0.771 & Fee split & taker fee only & 0.817 \\
+Allocation & persistent queue & 0.636 & Fee split & same net, maker-heavy & 0.498 \\
+Allocation & winner-take-all & 0.669 & Inventory fee & baseline & 0.852 \\
+\midrule
+Heterogeneity & asymmetric cost & 0.838 & Inventory fee & symmetric fee/rebate & 0.745 \\
+Heterogeneity & asymmetric rebate & 0.825 & Inventory fee & same net, taker-only & 0.874 \\
+Heterogeneity & rebate plus cost asymmetry & 0.848 & Routing & maker rebate vs neutral & 0.583 \\
+Latency & update cost 0.10 & 0.775 & Routing & taker fee vs neutral & 0.773 \\
+DQN sanity & baseline DQN & 0.475 & Inventory concentration & 3 makers & 0.388 \\
+Inventory concentration & 4 makers & 0.135 & Routing & same-net taker-heavy & 0.707 \\
+Routing & same-net maker-heavy & 0.679 & Routing & maker-taker vs neutral & 0.641 \\
+\bottomrule
+\end{tabular}
+\end{table*}

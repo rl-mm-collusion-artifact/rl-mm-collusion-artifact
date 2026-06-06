@@ -10,11 +10,11 @@ extension, while keeping benchmarks computable. Relative to ``MarketMakingGame``
   (``inventory_penalty``), and hard-capped (``inventory_cap``).
 
 Spread capture is unchanged (the winner earns the half-spread, plus rebate, minus
-adverse selection, on its volume), so the Bertrand tension is preserved. Because
-the mid random walk is mean-zero and the penalty is symmetric, symmetric play
-keeps inventory mean-zero; we compute the competitive and monopoly benchmarks by
-simulating symmetric play at each grid spread, so the collusion index remains
-well defined.
+adverse selection, on its volume), while a taker fee enters the all-in spread
+seen by order flow. Because the mid random walk is mean-zero and the penalty is
+symmetric, symmetric play keeps inventory mean-zero; we compute the competitive
+and monopoly benchmarks by simulating symmetric play at each grid spread, so the
+collusion index remains well defined.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ class InventoryGame:
     adverse_frac: float = 0.5
     adverse_cost: float = 0.2
     maker_rebate: float = 0.0
+    taker_fee: float = 0.0
     tie_rule: str = "split"
     # new dynamics
     sigma_mid: float = 0.3          # mid-price random-walk volatility
@@ -47,7 +48,8 @@ class InventoryGame:
         return len(self.spread_grid)
 
     def _volume(self, best_spread: float) -> float:
-        return float(self.q0 * np.exp(-self.elasticity * best_spread))
+        all_in_spread = max(0.0, best_spread + self.taker_fee)
+        return float(self.q0 * np.exp(-self.elasticity * all_in_spread))
 
     def _unit_margin(self, spread: float) -> float:
         return float(spread - self.adverse_frac * self.adverse_cost + self.maker_rebate)
